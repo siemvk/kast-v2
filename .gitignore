@@ -4,6 +4,8 @@ node_modules
 # output
 out
 dist
+build
+.react-router
 *.tgz
 
 # code coverage
@@ -32,3 +34,7 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # Finder (MacOS) folder config
 .DS_Store
+
+cookies.txt
+*.sqlite*
+client/dist

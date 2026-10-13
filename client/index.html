@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="nl">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kast</title>
+
+  <!-- BeerCSS & Material Icons -->
+  <link href="https://www.beercss.com/app.css" rel="stylesheet" />
+  <script type="module" src="https://cdn.jsdelivr.net/npm/beercss@5.0.3/dist/cdn/beer.min.js"></script>
+  <script type="module"
+    src="https://cdn.jsdelivr.net/npm/material-dynamic-colors@1.1.2/dist/cdn/material-dynamic-colors.min.js"></script>
+</head>
+
+<body class="dark" style>
+
+
+  <!-- top nav -->
+  <header>
+    <nav>
+      <i>inventory_2</i>
+      <h5>Kast</h5>
+      <div class="max"></div>
+
+      <div id="auth-status" class="row">
+        <button class="chip" id="login-btn" data-ui="#login-dialog">
+          <i>account_circle</i>
+          <span>Inloggen</span>
+        </button>
+      </div>
+      <button class="circle transparent" id="theme-btn" title="Toggle theme">
+        <i>light_mode</i>
+      </button>
+    </nav>
+  </header>
+
+  <main class="responsive padding">
+    <div id="loader" class="center">
+      <progress value="100" max="100" class="indeterminate"></progress>
+    </div>
+    <div class="page active" id="kast-list-page">
+      <h3>Kasten</h3>
+      <ul class="list border" id="kast-list">
+        <li>Item</li>
+      </ul>
+    </div>
+    <div class="page" id="kast-list-page">
+      <h3>Kasten</h3>
+      <ul class="list border" id="kast-list">
+        <li>Item</li>
+      </ul>
+    </div>
+    <div class="page" id="error-page">
+      <div class="center">
+
+        <i>error</i>
+        <h3>het is zo kapot dat de erorr pagina niet laad.</h3>
+      </div>
+    </div>
+
+  </main>
+
+  <dialog id="login-dialog" class="modal">
+    <h5>Inloggen</h5>
+    <form id="login-form">
+      <div class="field label border round">
+        <input type="text" id="login-username" required />
+        <label>Gebruikersnaam</label>
+      </div>
+      <div class="field label border round">
+        <input type="password" id="login-password" required />
+        <label>Wachtwoord</label>
+      </div>
+      <p id="login-error" class="error-text none"></p>
+      <nav class="right-align no-space">
+        <button type="button" class="transparent" id="cancel-login" data-ui="#login-dialog">Annuleren</button>
+        <button type="submit" class="primary">Inloggen</button>
+      </nav>
+    </form>
+  </dialog>
+
+  <dialog id="logout-dialog" class="modal">
+    <h5>Uitloggen</h5>
+    <p>Weet je het zeker?</p>
+    <nav>
+      <button class="transparent" id="cancel-login" data-ui="#logout-dialog">Annuleren</button>
+      <button id="logoutBtn">Ja!</button>
+    </nav>
+  </dialog>
+
+  <!-- Client Script -->
+  <script type="module" src="/app.js"></script>
+</body>
+
+</html>
