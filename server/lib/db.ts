@@ -5,7 +5,7 @@ import { sendMessageToDiscord } from "./webhook";
 export type user = {
     id: number;
     name: string;
-    pass: string;
+    pass?: string;
     isAdmin: boolean;
 };
 
@@ -121,7 +121,7 @@ class db {
     }
 
     public getUserByNameUNSAFE(Uname: string): user | undefined {
-        return this.getUserByName(Uname);
+        return this.data.users.find((u) => u.name === Uname);
     }
 
     public getUserById(Uid: number): user | undefined {

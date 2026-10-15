@@ -4,8 +4,8 @@ import { theDB } from "./db"
 
 export const auth = {
     async login(Uname: string, Upass: string) {
-        const user = theDB.getUserByName(Uname);
-        if (user == undefined) {
+        const user = theDB.getUserByNameUNSAFE(Uname);
+        if (user?.pass == undefined) {
             throw new Error("No.");
         }
 

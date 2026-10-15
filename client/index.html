@@ -36,16 +36,25 @@
   </header>
 
   <main class="responsive padding">
+    <!-- loader -->
     <div id="loader" class="absolute top responsive center-align no-space no-padding page active">
       <progress value="100" max="100" class="indeterminate"></progress>
     </div>
-
+    <!-- kasten/home -->
     <div class="page active" id="kast-list-page">
       <h3>Kasten</h3>
       <ul class="list border" id="kast-list">
         <li>Item</li>
       </ul>
+      <div id="leningen-container">
+
+        <h3>Open leningen</h3>
+        <ul class="list border" id="leningen-list">
+          <li>Item</li>
+        </ul>
+      </div>
     </div>
+    <!-- items -->
     <div class="page" id="kast-inhoud-page">
       <a class="back-link link"><i>arrow_back</i> Terug</a>
       <h3 id="kast-inhoud-head">Kasten</h3>
@@ -53,6 +62,7 @@
         <li>Item</li>
       </ul>
     </div>
+    <!-- error -->
     <div class="page" id="error-page">
       <div class="center-align">
         <i class="large">error</i>

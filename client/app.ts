@@ -8,7 +8,7 @@ const themeBtn = document.getElementById("theme-btn") as HTMLButtonElement;
 
 // Initialize
 document.addEventListener("DOMContentLoaded", () => {
-  ui("theme", "#ff5e00");
+  ui("theme", "#ff9900");
   setupTheme();
   for (let i = 0; i < backLinks.length; i++) {
     const backLink = backLinks[i];
@@ -138,8 +138,10 @@ lenenForm?.addEventListener("submit", async (e: SubmitEvent) => {
     .then(isOke)
     .then((v) => {
       setLoadingState(false)
+      let backup = lastPage
       ui("#lenen-dialog")
       kastDataPage(lenenContext!.kast);
+      lastPage = backup;
       lenenContext = null;
     })
     .catch((r) => {
@@ -162,47 +164,52 @@ fetch("/api/me")
         </button>
       `;
     }
-    fetch("/api/kasten/list")
-      .then((res) => {
-        if (!res.ok) {
-          // We reject the promise to trigger the catch block below
-          return Promise.reject();
-        }
-        return res.json();
-      })
-      .then((kasten: kast[]) => {
-        kastList.innerHTML = kasten
-          .map(
-            (kast) => `
+  })
+  .then(() => {
+    homePage();
+  }).catch(() => {
+    errorHandler("Je bent niet ingelogd.", true, "Probeer in te loggen en de pagina te herladen.");
+  });
+
+function homePage() {
+  setLoadingState(true)
+  fetch("/api/kasten/list")
+    .then((res) => {
+      if (!res.ok) {
+        // We reject the promise to trigger the catch block below
+        return Promise.reject();
+      }
+      return res.json();
+    })
+    .then((kasten: kast[]) => {
+      kastList.innerHTML = kasten
+        .map(
+          (kast) => `
           <li id="kast-${kast.id}" class="list-item">
               <span>${kast.name}</span>
               <small>${kast.description || "Geen beschrijving"}</small>
           </li>
         `)
-          .join("");
-        kasten.forEach((kast) => {
-          const kastElement = document.getElementById(`kast-${kast.id}`);
-          if (kastElement) {
-            kastElement.addEventListener("click", () => {
-              kastDataPage(kast);
-            });
-          }
-        });
-
-      })
-      .finally(() => {
-        setLoadingState(false)
-      })
-      .catch(() => {
-        setLoadingState(false)
-        errorHandler("Kon de kastenlijst niet ophalen.", true, "Controleer je internetverbinding en probeer het opnieuw.");
+        .join("");
+      kasten.forEach((kast) => {
+        const kastElement = document.getElementById(`kast-${kast.id}`);
+        if (kastElement) {
+          kastElement.addEventListener("click", () => {
+            kastDataPage(kast);
+          });
+        }
       });
-  }).finally(() => {
-    setLoadingState(false)
-  }).catch(() => {
-    setLoadingState(false)
-    errorHandler("Je bent niet ingelogd.", true, "Probeer in te loggen en de pagina te herladen.");
-  });
+
+    })
+    .finally(() => {
+      setLoadingState(false)
+    })
+    .catch(() => {
+      setLoadingState(false)
+      errorHandler("Kon de kastenlijst niet ophalen.", true, "Controleer je internetverbinding en probeer het opnieuw.");
+    });
+}
+
 
 function errorHandler(error: string, showReloadButton: boolean, tip?: string): void {
   setLoadingState(false)
