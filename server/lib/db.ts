@@ -1,4 +1,4 @@
-import { Database } from "bun:sqlite";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { randomUUIDv7 } from "bun";
 import { sendMessageToDiscord } from "./webhook";
 
@@ -20,6 +20,7 @@ export type item = {
     kast: number;
     name: string;
     description?: string;
+    beschikbaar: boolean;
 };
 
 export type session = {
@@ -28,101 +29,116 @@ export type session = {
     bad: Date;
 };
 
+export type database = {
+    sessions: session[];
+    kasten: kast[];
+    items: item[];
+    users: user[];
+    leningen: lening[];
+};
+
+export type lening = {
+    item: number;
+    user: number;
+    start: Date;
+    reason: string;
+    prommisedReturnInfo: string;
+    end?: Date;
+    id: number;
+}
+
+const defaultData: database = {
+    sessions: [],
+    kasten: [
+        {
+            id: 0,
+            name: "Voorbeeldkast",
+            description: "Dit is een voorbeeldkast.",
+        }
+    ],
+    items: [
+        {
+            id: 0,
+            kast: 0,
+            name: "Voorbeelditem",
+            description: "Dit is een voorbeelditem.",
+            beschikbaar: true,
+        },
+        {
+            id: 1,
+            kast: 0,
+            name: "Voorbeelditem 2",
+            description: "Dit is een voorbeelditem.",
+            beschikbaar: false,
+        }
+    ],
+    users: [
+        {
+            name: "siem",
+            id: 0,
+            isAdmin: true,
+            pass: Bun.password.hashSync("siem"),
+        }
+    ],
+    leningen: []
+};
+
 class db {
-    private sqlite: Database;
+    private data: database;
+    private path: string;
 
-    constructor(filename: string = "kast.sqlite") {
-        this.sqlite = new Database(filename);
-        this.init();
-    }
-
-    private init() {
-        this.sqlite.run("PRAGMA journal_mode = WAL;");
-
-        this.sqlite.run(`
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT UNIQUE NOT NULL,
-                pass TEXT NOT NULL,
-                isAdmin INTEGER NOT NULL DEFAULT 0
-            );
-
-            CREATE TABLE IF NOT EXISTS sessions (
-                cookie TEXT PRIMARY KEY,
-                user INTEGER NOT NULL,
-                bad INTEGER NOT NULL,
-                FOREIGN KEY(user) REFERENCES users(id)
-            );
-
-            CREATE TABLE IF NOT EXISTS kasten (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                description TEXT
-            );
-
-            CREATE TABLE IF NOT EXISTS items (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                kast INTEGER NOT NULL,
-                name TEXT NOT NULL,
-                description TEXT,
-                FOREIGN KEY(kast) REFERENCES kasten(id)
-            );
-        `);
-
-        // Seed default admin user siem if not exists
-        const existingUser = this.getUserByName("siem");
-        if (!existingUser) {
-            this.sqlite.run(
-                `INSERT INTO users (id, name, pass, isAdmin) VALUES (?, ?, ?, ?)`,
-                [1234, "siem", Bun.password.hashSync("siem"), 1]
-            );
+    constructor(filename: string = "kast.json") {
+        this.path = filename;
+        if (existsSync(this.path)) {
+            try {
+                const raw = readFileSync(this.path, "utf-8");
+                this.data = JSON.parse(raw);
+            } catch {
+                this.data = structuredClone(defaultData);
+                this.writeOut();
+            }
+        } else {
+            this.data = structuredClone(defaultData);
+            this.writeOut();
         }
 
-        // Seed default session if not exists
-        const existingSession = this.sqlite.query(`SELECT cookie FROM sessions WHERE cookie = ?`).get("abc");
-        if (!existingSession) {
-            this.sqlite.run(
-                `INSERT INTO sessions (cookie, user, bad) VALUES (?, ?, ?)`,
-                ["abc", 1234, Date.now() + 7 * 24 * 60 * 60 * 1000]
-            );
-        }
-
-        // Seed default kast if not exists
-        const existingKast = this.sqlite.query(`SELECT id FROM kasten WHERE id = 0`).get();
-        if (!existingKast) {
-            this.sqlite.run(
-                `INSERT INTO kasten (id, name, description) VALUES (?, ?, ?)`,
-                [0, "None", "No kast."]
-            );
-        }
+        if (!Array.isArray(this.data.sessions)) this.data.sessions = [];
+        if (!Array.isArray(this.data.kasten)) this.data.kasten = [];
+        if (!Array.isArray(this.data.items)) this.data.items = [];
+        if (!Array.isArray(this.data.users)) this.data.users = [];
+        if (!Array.isArray(this.data.leningen)) this.data.leningen = [];
     }
 
     public getUserByName(Uname: string): user | undefined {
-        const row = this.sqlite.query<any, [string]>(
-            `SELECT id, name, pass, isAdmin FROM users WHERE name = ?`
-        ).get(Uname);
-
-        if (!row) return undefined;
+        const user = this.data.users.find((u) => u.name === Uname);
+        if (!user) return undefined;
         return {
-            id: row.id,
-            name: row.name,
-            pass: row.pass,
-            isAdmin: Boolean(row.isAdmin),
+            id: user.id,
+            name: user.name,
+            isAdmin: user.isAdmin,
+            pass: "No.",
         };
     }
 
-    public getUserById(Uid: number): user | undefined {
-        const row = this.sqlite.query<any, [number]>(
-            `SELECT id, name, pass, isAdmin FROM users WHERE id = ?`
-        ).get(Uid);
+    public getUserByNameUNSAFE(Uname: string): user | undefined {
+        return this.getUserByName(Uname);
+    }
 
-        if (!row) return undefined;
+    public getUserById(Uid: number): user | undefined {
+        const user = this.data.users.find((u) => u.id === Number(Uid));
+        if (!user) return undefined;
         return {
-            id: row.id,
-            name: row.name,
-            pass: row.pass,
-            isAdmin: Boolean(row.isAdmin),
+            id: user.id,
+            name: user.name,
+            isAdmin: user.isAdmin,
+            pass: "No.",
         };
+    }
+
+    public getUserByIdUNSAFE(Uid: number): user | undefined {
+        const user = this.data.users.find((u) => u.id === Number(Uid));
+        if (!user) return undefined;
+        return { ...user };
     }
 
     public createSession(Uid: number): session | undefined {
@@ -130,33 +146,28 @@ class db {
         if (user == undefined) return undefined;
 
         const session: session = {
-            user: Uid,
+            user: Number(Uid),
             cookie: randomUUIDv7(),
             bad: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         };
 
-        this.sqlite.run(
-            `INSERT INTO sessions (cookie, user, bad) VALUES (?, ?, ?)`,
-            [session.cookie, session.user, session.bad.getTime()]
-        );
+        this.data.sessions.push(session);
 
         sendMessageToDiscord("", {
             title: "Session made",
             description: `user: ${user.name}`,
             timestamp: new Date().toISOString(),
         });
+        this.writeOut();
 
         return session;
     }
 
     public validateCookie(Ucookie: string): false | user {
-        const row = this.sqlite.query<any, [string]>(
-            `SELECT cookie, user, bad FROM sessions WHERE cookie = ?`
-        ).get(Ucookie);
+        const session = this.data.sessions.find((s) => s.cookie === Ucookie);
+        if (!session || new Date(session.bad).getTime() < Date.now()) return false;
 
-        if (!row || row.bad < Date.now()) return false;
-
-        const user = this.getUserById(row.user);
+        const user = this.getUserById(session.user);
         if (user == undefined) return false;
 
         return user;
@@ -164,60 +175,141 @@ class db {
 
     public createUser(name: string, rawPassword: string, isAdmin: boolean = false): user {
         const hash = Bun.password.hashSync(rawPassword);
-        const res = this.sqlite.run(
-            `INSERT INTO users (name, pass, isAdmin) VALUES (?, ?, ?)`,
-            [name, hash, isAdmin ? 1 : 0]
-        );
-        return {
-            id: Number(res.lastInsertRowid),
+        const nextId = this.data.users.length > 0
+            ? Math.max(...this.data.users.map((u) => u.id)) + 1
+            : 0;
+        const user: user = {
+            id: nextId,
             name,
             pass: hash,
             isAdmin,
         };
+        this.data.users.push(user);
+        this.writeOut();
+        return user;
     }
 
     public getKasten(): kast[] {
-        return this.sqlite.query<kast, []>(`SELECT id, name, description FROM kasten`).all();
+        return this.data.kasten;
     }
 
     public getKastById(id: number): kast | undefined {
-        return this.sqlite.query<kast, [number]>(`SELECT id, name, description FROM kasten WHERE id = ?`).get(id) ?? undefined;
+        const kast = this.data.kasten.find((k) => k.id === Number(id));
+        return kast;
     }
 
     public createKast(name: string, description?: string): kast {
-        const res = this.sqlite.run(
-            `INSERT INTO kasten (name, description) VALUES (?, ?)`,
-            [name, description ?? null]
-        );
-        return {
-            id: Number(res.lastInsertRowid),
+        const nextId = this.newId(this.data.kasten)
+        const kast: kast = {
+            id: nextId,
             name,
             description,
         };
+        this.data.kasten.push(kast);
+        this.writeOut();
+        return kast;
     }
-    public getKastItemsBasedOnKast(kastId: number) {
-        const res = this.sqlite.query<item, [number]>(`SELECT id, kast, name, description FROM items WHERE kast = ?`).all(kastId);
-        return res;
+
+    public getKastItemsBasedOnKast(kastId: number): item[] {
+        const items = this.data.items.filter((item) => item.kast === Number(kastId));
+        return items;
     }
 
     public getItems(kastId?: number): item[] {
         if (kastId !== undefined) {
-            return this.sqlite.query<item, [number]>(`SELECT id, kast, name, description FROM items WHERE kast = ?`).all(kastId);
+            return this.getKastItemsBasedOnKast(kastId);
         }
-        return this.sqlite.query<item, []>(`SELECT id, kast, name, description FROM items`).all();
+        return this.data.items;
     }
 
-    public createItem(kastId: number, name: string, description?: string): item {
-        const res = this.sqlite.run(
-            `INSERT INTO items (kast, name, description) VALUES (?, ?, ?)`,
-            [kastId, name, description ?? null]
-        );
-        return {
-            id: Number(res.lastInsertRowid),
-            kast: kastId,
+    public createItem(kastId: number, name: string, description?: string, beschikbaar: boolean = true): item {
+        const nextId = this.newId(this.data.items)
+        const item: item = {
+            id: nextId,
+            kast: Number(kastId),
             name,
             description,
+            beschikbaar,
         };
+        this.data.items.push(item);
+        this.writeOut();
+        return item;
+    }
+
+    public leenItem(itemId: number, userId: number, Ureason: string, Ureturn: string): lening | undefined {
+        const item = this.data.items.find((i) => i.id === Number(itemId));
+        if (!item || !item.beschikbaar) return undefined;
+
+        const nextId = this.newId(this.data.leningen)
+
+        const lening: lening = {
+            item: Number(itemId),
+            user: Number(userId),
+            start: new Date(),
+            id: nextId,
+            prommisedReturnInfo: Ureturn,
+            reason: Ureason
+
+        };
+
+        item.beschikbaar = false;
+        this.data.leningen.push(lening);
+        this.writeOut();
+        return lening;
+    }
+
+    public returnItem(leningId: number): boolean {
+        const lening = this.data.leningen.find((l) => l.id === Number(leningId));
+        if (!lening || lening.end) return false;
+
+        const item = this.data.items.find((i) => i.id === Number(lening.item));
+        if (!item) return false;
+
+        item.beschikbaar = true;
+        lening.end = new Date();
+        this.writeOut();
+        return true;
+    }
+    public openLeningen() {
+        return this.data.leningen.filter((v) => v.end !== undefined)
+    }
+
+    public allLeningen() {
+        return this.data.leningen
+    }
+
+    public removeOldLeningen() {
+        const now = new Date();
+        const tweeMaandenTerug = new Date(now.getFullYear(), now.getMonth() - 2, now.getDate());
+        this.data.leningen = this.data.leningen.filter((lening) => {
+            if (lening.end && lening.end < tweeMaandenTerug) {
+                return false; // Remove leningen older than 2 months
+            }
+            return true; // Keep leningen that are not older than 2 months
+        });
+        this.writeOut();
+    }
+
+    private writeOut() {
+        writeFileSync(this.path, JSON.stringify(this.data, null, 2), "utf-8");
+    }
+
+    private newId(list: any[]): number {
+        const nextId = list.length > 0
+            ? Math.max(...list.map((l) => l.id)) + 1
+            : 0;
+        return nextId;
+    }
+    public deleteSession(cookie: string): void {
+        this.data.sessions = this.data.sessions.filter((s) => s.cookie !== cookie);
+        this.writeOut();
+    }
+    public extendSession(cookie: string): void {
+        const session = this.data.sessions.find((s) => s.cookie === cookie);
+        if (session) {
+            session.bad = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        }
+        this.writeOut();
     }
 }
 

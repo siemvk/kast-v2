@@ -1,3 +1,5 @@
+import { sleep, type BunRequest } from "bun";
+import type { user } from "../../shared/types";
 import { theDB } from "./db"
 
 export const auth = {
@@ -15,13 +17,41 @@ export const auth = {
 
         return theDB.createSession(user.id)
     },
-    extendCookie(Ucookie: string) {
-        const user = theDB.validateCookie(Ucookie);
-
-        if (!user) throw new Error("Invalid.");
-
-        theDB.createSession(user.id)
-
-
+    async gate(
+        Ureq: BunRequest,
+        oke: ((arg0: user) => (Response | Promise<Response>)),
+        notOke?: () => Response | Promise<Response>
+    ): Promise<Response> {
+        const user = theDB.validateCookie(
+            Ureq.cookies.get("kast-token") || "invalid"
+        )
+        if (user) {
+            return await oke(user)
+        } else {
+            if (notOke) {
+                return await notOke()
+            } else {
+                return new Response("No.", { status: 500 })
+            }
+        }
+    },
+    async admin(
+        Ureq: BunRequest,
+        oke: ((arg0: user) => (Response | Promise<Response>)),
+        notOke?: () => Response | Promise<Response>
+    ): Promise<Response> {
+        const user = theDB.validateCookie(
+            Ureq.cookies.get("kast-token") || "invalid"
+        )
+        if (user && user.isAdmin) {
+            return await oke(user)
+        } else {
+            if (notOke) {
+                return await notOke()
+            } else {
+                return new Response("No.", { status: 500 })
+            }
+        }
     }
+
 }

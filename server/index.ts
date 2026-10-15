@@ -1,3 +1,4 @@
+import { sleep } from "bun";
 import type { loginRequest } from "../shared/types";
 import { auth } from "./lib/auth";
 import { theDB } from "./lib/db";
@@ -11,56 +12,69 @@ const server = Bun.serve({
 
         // Dynamic routes
         "/api/admin/users/:id": req => {
-            const user = theDB.validateCookie(
-                req.cookies.get("kast-token") || "invalid"
-            )
-            if (user) {
-                if (!user.isAdmin) return new Response("No.", { status: 500 })
-
-                sendMessageToDiscord("john", {
-                    color: 255,
-                    title: "hi"
-                })
+            return auth.admin(req, () => {
                 return new Response(JSON.stringify(theDB.getUserById(req.params.id as unknown as number)));
-            } else {
-                return new Response("No.", { status: 500 })
-            }
+            })
+        },
+        "/api/admin/leningen": req => {
+            return auth.admin(req, () => {
+                return new Response(JSON.stringify(theDB.allLeningen()));
+            })
+        },
+        "/api/admin/leningen/open": req => {
+            return auth.admin(req, () => {
+                return new Response(JSON.stringify(theDB.openLeningen()));
+            })
+        },
+        "/api/admin/leningen/purge": req => {
+            return auth.admin(req, () => {
+                return new Response(JSON.stringify(theDB.removeOldLeningen()));
+            })
+        },
+        "/api/leningen": req => {
+            return auth.gate(req, (user) => {
+                return new Response(JSON.stringify(theDB.openLeningen().filter((v) => v.user == user.id)));
+            })
         },
 
-        // Check current authenticated user
         "/api/me": req => {
-            const token = req.cookies.get("kast-token");
-            if (!token) return new Response(JSON.stringify({ error: "Niet ingelogd" }), { status: 401 });
-            const user = theDB.validateCookie(token);
-            if (!user) return new Response(JSON.stringify({ error: "Ongeldige sessie" }), { status: 401 });
-            return new Response(JSON.stringify({ id: user.id, name: user.name, isAdmin: user.isAdmin }));
+            return auth.gate(req, (user) => {
+                theDB.extendSession(req.cookies.get("kast-token") || "")
+                return new Response(JSON.stringify({ id: user.id, name: user.name, isAdmin: user.isAdmin }));
+            }, () => {
+                return new Response(JSON.stringify({ error: "Ongeldige sessie" }), { status: 401 });
+            })
         },
 
-        // Logout route
         "/api/auth/logout": req => {
+            theDB.deleteSession(req.cookies.get("kast-token") || "")
             req.cookies.set("kast-token", "", { maxAge: 0, path: "/" });
             return new Response(JSON.stringify({ success: true }));
         },
 
         "/api/kasten/list": req => {
-            const user = theDB.validateCookie(
-                req.cookies.get("kast-token") || "invalid"
-            )
-            if (user) {
+            return auth.gate(req, () => {
                 return new Response(JSON.stringify(theDB.getKasten()))
-            } else {
-                return new Response("No.", { status: 500 })
-            }
+            })
         },
-        "/api/kasten/content/:id": req => {
-            const user = theDB.validateCookie(
-                req.cookies.get("kast-token") || "invalid"
-            )
-            if (user) {
+        "/api/kasten/:id/items": async req => {
+            return auth.gate(req, () => {
                 return new Response(JSON.stringify(theDB.getKastItemsBasedOnKast(req.params.id as unknown as number)))
-            } else {
-                return new Response("No.", { status: 500 })
-            }
+            })
+        },
+        "/api/leningen/leen/:itemId": async req => {
+            return auth.gate(req, async (user) => {
+                const body = await req.json() as { reason: string, prommisedReturnInfo: string } | undefined;
+                if (!body) {
+                    return new Response(JSON.stringify({ error: "Geen body gegeven" }), { status: 400 });
+                }
+                const lening = theDB.leenItem(req.params.itemId as unknown as number, user.id, body.reason, body.prommisedReturnInfo);
+                if (!lening) {
+                    return new Response(JSON.stringify({ error: "Item niet beschikbaar" }), { status: 400 });
+                }
+                sendMessageToDiscord(`Item ${lening.item} is geleend door ${user.name} voor reden: ${body.reason}`);
+                return new Response(JSON.stringify(lening));
+            })
         },
 
         "/api/auth": async req => {
@@ -72,7 +86,13 @@ const server = Bun.serve({
                 } else {
                     resp = await auth.login(body.name, body.pass)
                     if (resp == undefined) throw new Error("Not Found");
-                    req.cookies.set("kast-token", resp?.cookie)
+                    // req.cookies.set("kast-token", resp?.cookie)
+                    req.cookies.set("kast-token", resp?.cookie, {
+                        httpOnly: true,
+                        sameSite: "lax",
+                        path: "/",
+                        maxAge: 7 * 24 * 60 * 60,
+                    });
                 }
 
 

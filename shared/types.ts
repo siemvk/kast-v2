@@ -21,4 +21,5 @@ export type item = {
     kast: number;
     name: string;
     description?: string;
+    beschikbaar: boolean;
 };
