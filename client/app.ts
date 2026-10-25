@@ -72,6 +72,7 @@ const kastInhoudHeader = document.getElementById("kast-inhoud-head") as HTMLHead
 const kastInhoudList = document.getElementById("kast-inhoud-list") as HTMLUListElement;
 const lenenError = document.getElementById("lenen-error") as HTMLParagraphElement;
 const lenenForm = document.getElementById("lenen-form") as HTMLFormElement;
+const waarDialogTitle = document.getElementById("waar-dialog-title") as HTMLHeadingElement;
 const waarDialogText = document.getElementById("waar-dialog-text") as HTMLParagraphElement;
 
 // PAGES
@@ -152,6 +153,7 @@ lenenForm?.addEventListener("submit", async (e: SubmitEvent) => {
       ui("#lenen-dialog")
 
       const k = ctx.kast ?? ctx.item.kastData;
+      waarDialogTitle.textContent = "Geleend!";
       waarDialogText.textContent = k
         ? `Je vindt "${ctx.item.name}" in: ${k.name}${k.description ? ` (${k.description})` : ""}.`
         : `Je vindt "${ctx.item.name}" in kast #${ctx.item.kast}.`;
@@ -196,19 +198,24 @@ fetch("/api/me")
     errorHandler("Je bent niet ingelogd.", true, "Probeer in te loggen en de pagina te herladen.");
   });
 
-let pendingReturnId: number | null = null;
+let pendingReturn: { id: number; name: string; kast: string } | null = null;
 const terugConfirmBtn = document.getElementById("terug-confirm-btn") as HTMLButtonElement;
 const terugDialogText = document.getElementById("terug-dialog-text") as HTMLParagraphElement;
 
 terugConfirmBtn?.addEventListener("click", () => {
-  if (pendingReturnId === null) return;
-  const id = pendingReturnId;
-  pendingReturnId = null;
+  if (!pendingReturn) return;
+  const { id, name, kast } = pendingReturn;
+  pendingReturn = null;
   ui("#terug-dialog");
   setLoadingState(true);
   fetch(`/api/leningen/terug/${id}`, { method: "POST" })
     .then(isOke)
-    .then(() => currentPage === adminPage ? adminDataPage(false) : homePage())
+    .then(() => {
+      waarDialogTitle.textContent = "Teruggebracht!";
+      waarDialogText.textContent = `Leg "${name}" terug in: ${kast}.`;
+      ui("#waar-dialog");
+      return currentPage === adminPage ? adminDataPage(false) : homePage();
+    })
     .catch((r) => errorHandler(r, true, "Kon item niet terugbrengen."));
 });
 
@@ -333,6 +340,8 @@ adminUserForm?.addEventListener("submit", (e: SubmitEvent) => {
 function renderLeningItem(lening: lening, showUser = false): string {
   const userLabel = showUser ? `Door: ${lening.userData?.name ?? `User #${lening.user}`} | ` : "";
   const itemName = lening.itemData?.name || `Item ID: ${lening.item}`;
+  const k = lening.itemData?.kastData;
+  const kastInfo = k ? `${k.name}${k.description ? ` (${k.description})` : ""}` : `kast #${lening.itemData?.kast ?? "?"}`;
   return `
     <li class="list-item">
       <nav class="responsive">
@@ -341,7 +350,7 @@ function renderLeningItem(lening: lening, showUser = false): string {
           <div><small>${userLabel}${lening.itemData?.description ? `${lening.itemData.description} | ` : ""}Reden: ${lening.reason} | Terug: ${lening.prommisedReturnInfo}</small></div>
         </div>
         <div class="max"></div>
-        <button data-return-id="${lening.id}" data-return-name="${itemName}" class="primary">Terugbrengen</button>
+        <button data-return-id="${lening.id}" data-return-name="${itemName}" data-return-kast="${kastInfo}" class="primary">Terugbrengen</button>
       </nav>
     </li>
   `;
@@ -350,8 +359,12 @@ function renderLeningItem(lening: lening, showUser = false): string {
 function bindReturnButtons(container: HTMLElement) {
   container.querySelectorAll<HTMLButtonElement>("[data-return-id]").forEach((btn) => {
     btn.onclick = () => {
-      pendingReturnId = Number(btn.dataset.returnId);
-      terugDialogText.textContent = `Weet je zeker dat je "${btn.dataset.returnName}" terug wilt brengen?`;
+      pendingReturn = {
+        id: Number(btn.dataset.returnId),
+        name: btn.dataset.returnName || "",
+        kast: btn.dataset.returnKast || "",
+      };
+      terugDialogText.textContent = `Weet je zeker dat je "${pendingReturn.name}" terug wilt brengen?`;
       ui("#terug-dialog");
     };
   });

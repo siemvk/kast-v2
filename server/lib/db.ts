@@ -316,7 +316,8 @@ class db {
         return true;
     }
     public getItemById(id: number): item | undefined {
-        return this.data.items.find((i) => i.id === Number(id));
+        const i = this.data.items.find((i) => i.id === Number(id));
+        return i ? { ...i, kastData: this.getKastById(i.kast) } : undefined;
     }
 
     public openLeningen(): lening[] {

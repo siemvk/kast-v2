@@ -146,11 +146,11 @@
   <dialog id="user-create-dialog" class="modal">
     <h5>Nieuwe gebruiker</h5>
     <form id="admin-user-form">
-      <div class="field label border round">
+      <div class="field label border">
         <input type="text" id="new-user-name" required />
         <label>Gebruikersnaam</label>
       </div>
-      <div class="field label border round">
+      <div class="field label border">
         <input type="password" id="new-user-pass" required />
         <label>Wachtwoord</label>
       </div>
@@ -195,7 +195,7 @@
   </dialog>
 
   <dialog id="waar-dialog" class="modal">
-    <h5>Geleend!</h5>
+    <h5 id="waar-dialog-title">Geleend!</h5>
     <p id="waar-dialog-text"></p>
     <nav class="right-align no-space">
       <button class="primary" data-ui="#waar-dialog">Top!</button>
@@ -205,11 +205,11 @@
   <dialog id="user-edit-dialog" class="modal">
     <h5>Gebruiker bewerken</h5>
     <form id="user-edit-form">
-      <div class="field label border round">
+      <div class="field label border">
         <input type="text" id="edit-user-name" required />
         <label>Gebruikersnaam</label>
       </div>
-      <div class="field label border round">
+      <div class="field label border">
         <input type="password" id="edit-user-pass" />
         <label>Nieuw wachtwoord (optioneel)</label>
       </div>
@@ -227,11 +227,11 @@
   <dialog id="kast-edit-dialog" class="modal">
     <h5>Kast bewerken</h5>
     <form id="kast-edit-form">
-      <div class="field label border round">
+      <div class="field label border">
         <input type="text" id="edit-kast-name" required />
         <label>Naam</label>
       </div>
-      <div class="field label border round">
+      <div class="field label border">
         <input type="text" id="edit-kast-desc" />
         <label>Beschrijving</label>
       </div>
@@ -245,15 +245,15 @@
   <dialog id="item-edit-dialog" class="modal">
     <h5>Item bewerken</h5>
     <form id="item-edit-form">
-      <div class="field label border round">
+      <div class="field label border">
         <input type="text" id="edit-item-name" required />
         <label>Naam</label>
       </div>
-      <div class="field label border round">
+      <div class="field label border">
         <input type="text" id="edit-item-desc" />
         <label>Beschrijving</label>
       </div>
-      <div class="field label suffix border round">
+      <div class="field label suffix border">
         <select id="edit-item-kast"></select>
         <label>Kast</label>
         <i>arrow_drop_down</i>
