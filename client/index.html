@@ -29,6 +29,10 @@
           <span>Inloggen</span>
         </button>
       </div>
+      <button class="chip" id="admin-btn" style="display: none;">
+        <i>admin_panel_settings</i>
+        <span>Admin</span>
+      </button>
       <button class="circle transparent" id="theme-btn" title="Toggle theme">
         <i>light_mode</i>
       </button>
@@ -40,18 +44,49 @@
     <div id="loader" class="absolute top responsive center-align no-space no-padding page active">
       <progress value="100" max="100" class="indeterminate"></progress>
     </div>
-    <!-- kasten/home -->
+    <!-- home -->
     <div class="page active" id="kast-list-page">
-      <h3>Kasten</h3>
-      <ul class="list border" id="kast-list">
-        <li>Item</li>
-      </ul>
       <div id="leningen-container">
-
         <h3>Open leningen</h3>
         <ul class="list border" id="leningen-list">
           <li>Item</li>
         </ul>
+      </div>
+      <h3>Spullen</h3>
+      <div class="field label prefix border round">
+        <i>search</i>
+        <input type="search" id="items-search" />
+        <label>Zoeken...</label>
+      </div>
+      <ul class="list border" id="items-list">
+        <li>Item</li>
+      </ul>
+    </div>
+    <!-- admin -->
+    <div class="page" id="admin-page">
+      <a class="back-link link"><i>arrow_back</i> Terug</a>
+      <h3>Admin</h3>
+      <div>
+        <div class="tabs">
+          <a class="active" data-ui="#admin-tab-leningen">Leningen</a>
+          <a data-ui="#admin-tab-kasten">Kasten</a>
+          <a data-ui="#admin-tab-gebruikers">Gebruikers</a>
+        </div>
+        <div class="page padding active" id="admin-tab-leningen">
+          <ul class="list border" id="admin-leningen-list"></ul>
+        </div>
+        <div class="page padding" id="admin-tab-kasten">
+          <ul class="list border" id="kast-list"></ul>
+        </div>
+        <div class="page padding" id="admin-tab-gebruikers">
+          <nav class="right-align">
+            <button class="primary" data-ui="#user-create-dialog">
+              <i>person_add</i>
+              <span>Nieuwe gebruiker</span>
+            </button>
+          </nav>
+          <ul class="list border" id="admin-users-list"></ul>
+        </div>
       </div>
     </div>
     <!-- items -->
@@ -99,6 +134,46 @@
     </nav>
   </dialog>
 
+  <dialog id="terug-dialog" class="modal">
+    <h5>Terugbrengen</h5>
+    <p id="terug-dialog-text">Weet je zeker dat je dit item terug wilt brengen?</p>
+    <nav class="right-align no-space">
+      <button class="transparent" data-ui="#terug-dialog">Annuleren</button>
+      <button class="primary" id="terug-confirm-btn">Ja, terugbrengen</button>
+    </nav>
+  </dialog>
+
+  <dialog id="user-create-dialog" class="modal">
+    <h5>Nieuwe gebruiker</h5>
+    <form id="admin-user-form">
+      <div class="field label border round">
+        <input type="text" id="new-user-name" required />
+        <label>Gebruikersnaam</label>
+      </div>
+      <div class="field label border round">
+        <input type="password" id="new-user-pass" required />
+        <label>Wachtwoord</label>
+      </div>
+      <label class="checkbox">
+        <input type="checkbox" id="new-user-admin" />
+        <span>Admin</span>
+      </label>
+      <nav class="right-align no-space">
+        <button type="button" class="transparent" data-ui="#user-create-dialog">Annuleren</button>
+        <button type="submit" class="primary">Toevoegen</button>
+      </nav>
+    </form>
+  </dialog>
+
+  <dialog id="user-delete-dialog" class="modal">
+    <h5>Gebruiker verwijderen</h5>
+    <p id="user-delete-dialog-text">Weet je zeker dat je deze gebruiker wilt verwijderen?</p>
+    <nav class="right-align no-space">
+      <button class="transparent" data-ui="#user-delete-dialog">Annuleren</button>
+      <button class="error" id="user-delete-confirm-btn">Ja, verwijderen</button>
+    </nav>
+  </dialog>
+
   <dialog id="lenen-dialog" class="modal">
     <h5>Lenen</h5>
     <p>Je gaat een item lenen. Vul hieronder in waarom en voor hoe lang.</p>
@@ -115,6 +190,77 @@
       <nav class="right-align no-space">
         <button type="button" class="transparent" id="cancel-lenen" data-ui="#lenen-dialog">Annuleren</button>
         <button type="submit" class="primary">Lenen</button>
+      </nav>
+    </form>
+  </dialog>
+
+  <dialog id="waar-dialog" class="modal">
+    <h5>Geleend!</h5>
+    <p id="waar-dialog-text"></p>
+    <nav class="right-align no-space">
+      <button class="primary" data-ui="#waar-dialog">Top!</button>
+    </nav>
+  </dialog>
+
+  <dialog id="user-edit-dialog" class="modal">
+    <h5>Gebruiker bewerken</h5>
+    <form id="user-edit-form">
+      <div class="field label border round">
+        <input type="text" id="edit-user-name" required />
+        <label>Gebruikersnaam</label>
+      </div>
+      <div class="field label border round">
+        <input type="password" id="edit-user-pass" />
+        <label>Nieuw wachtwoord (optioneel)</label>
+      </div>
+      <label class="checkbox">
+        <input type="checkbox" id="edit-user-admin" />
+        <span>Admin</span>
+      </label>
+      <nav class="right-align no-space">
+        <button type="button" class="transparent" data-ui="#user-edit-dialog">Annuleren</button>
+        <button type="submit" class="primary">Opslaan</button>
+      </nav>
+    </form>
+  </dialog>
+
+  <dialog id="kast-edit-dialog" class="modal">
+    <h5>Kast bewerken</h5>
+    <form id="kast-edit-form">
+      <div class="field label border round">
+        <input type="text" id="edit-kast-name" required />
+        <label>Naam</label>
+      </div>
+      <div class="field label border round">
+        <input type="text" id="edit-kast-desc" />
+        <label>Beschrijving</label>
+      </div>
+      <nav class="right-align no-space">
+        <button type="button" class="transparent" data-ui="#kast-edit-dialog">Annuleren</button>
+        <button type="submit" class="primary">Opslaan</button>
+      </nav>
+    </form>
+  </dialog>
+
+  <dialog id="item-edit-dialog" class="modal">
+    <h5>Item bewerken</h5>
+    <form id="item-edit-form">
+      <div class="field label border round">
+        <input type="text" id="edit-item-name" required />
+        <label>Naam</label>
+      </div>
+      <div class="field label border round">
+        <input type="text" id="edit-item-desc" />
+        <label>Beschrijving</label>
+      </div>
+      <div class="field label suffix border round">
+        <select id="edit-item-kast"></select>
+        <label>Kast</label>
+        <i>arrow_drop_down</i>
+      </div>
+      <nav class="right-align no-space">
+        <button type="button" class="transparent" data-ui="#item-edit-dialog">Annuleren</button>
+        <button type="submit" class="primary">Opslaan</button>
       </nav>
     </form>
   </dialog>

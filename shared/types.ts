@@ -22,4 +22,17 @@ export type item = {
     name: string;
     description?: string;
     beschikbaar: boolean;
+    kastData?: kast;
+};
+
+export type lening = {
+    item: number;
+    user: number;
+    start: Date | string;
+    reason: string;
+    prommisedReturnInfo: string;
+    end?: Date | string;
+    id: number;
+    itemData?: item;
+    userData?: user;
 };

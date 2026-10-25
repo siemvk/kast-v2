@@ -1,6 +1,5 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { randomUUIDv7 } from "bun";
-import { sendMessageToDiscord } from "./webhook";
 
 export type user = {
     id: number;
@@ -21,6 +20,7 @@ export type item = {
     name: string;
     description?: string;
     beschikbaar: boolean;
+    kastData?: kast;
 };
 
 export type session = {
@@ -45,6 +45,8 @@ export type lening = {
     prommisedReturnInfo: string;
     end?: Date;
     id: number;
+    itemData?: item;
+    userData?: user;
 }
 
 const defaultData: database = {
@@ -109,6 +111,15 @@ class db {
         if (!Array.isArray(this.data.leningen)) this.data.leningen = [];
     }
 
+    public getUsers(): user[] {
+        return this.data.users.map((u) => ({
+            id: u.id,
+            name: u.name,
+            isAdmin: u.isAdmin,
+            pass: "No.",
+        }));
+    }
+
     public getUserByName(Uname: string): user | undefined {
         const user = this.data.users.find((u) => u.name === Uname);
         if (!user) return undefined;
@@ -152,12 +163,6 @@ class db {
         };
 
         this.data.sessions.push(session);
-
-        sendMessageToDiscord("", {
-            title: "Session made",
-            description: `user: ${user.name}`,
-            timestamp: new Date().toISOString(),
-        });
         this.writeOut();
 
         return session;
@@ -189,6 +194,45 @@ class db {
         return user;
     }
 
+    public deleteUser(id: number): boolean {
+        const uid = Number(id);
+        const before = this.data.users.length;
+        this.data.users = this.data.users.filter((u) => u.id !== uid);
+        if (this.data.users.length === before) return false;
+        this.data.sessions = this.data.sessions.filter((s) => s.user !== uid);
+        this.writeOut();
+        return true;
+    }
+
+    public updateUser(id: number, data: { name?: string; pass?: string; isAdmin?: boolean }): boolean {
+        const u = this.data.users.find((u) => u.id === Number(id));
+        if (!u) return false;
+        if (data.name) u.name = data.name;
+        if (data.pass) u.pass = Bun.password.hashSync(data.pass);
+        if (data.isAdmin !== undefined) u.isAdmin = data.isAdmin;
+        this.writeOut();
+        return true;
+    }
+
+    public updateKast(id: number, name: string, description?: string): boolean {
+        const k = this.data.kasten.find((k) => k.id === Number(id));
+        if (!k) return false;
+        k.name = name;
+        k.description = description;
+        this.writeOut();
+        return true;
+    }
+
+    public updateItem(id: number, data: { name: string; description?: string; kast?: number }): boolean {
+        const i = this.data.items.find((i) => i.id === Number(id));
+        if (!i) return false;
+        i.name = data.name;
+        i.description = data.description;
+        if (data.kast !== undefined) i.kast = Number(data.kast);
+        this.writeOut();
+        return true;
+    }
+
     public getKasten(): kast[] {
         return this.data.kasten;
     }
@@ -211,15 +255,16 @@ class db {
     }
 
     public getKastItemsBasedOnKast(kastId: number): item[] {
-        const items = this.data.items.filter((item) => item.kast === Number(kastId));
-        return items;
+        return this.data.items
+            .filter((item) => item.kast === Number(kastId))
+            .map((i) => ({ ...i, kastData: this.getKastById(i.kast) }));
     }
 
     public getItems(kastId?: number): item[] {
         if (kastId !== undefined) {
             return this.getKastItemsBasedOnKast(kastId);
         }
-        return this.data.items;
+        return this.data.items.map((i) => ({ ...i, kastData: this.getKastById(i.kast) }));
     }
 
     public createItem(kastId: number, name: string, description?: string, beschikbaar: boolean = true): item {
@@ -270,12 +315,26 @@ class db {
         this.writeOut();
         return true;
     }
-    public openLeningen() {
-        return this.data.leningen.filter((v) => v.end !== undefined)
+    public getItemById(id: number): item | undefined {
+        return this.data.items.find((i) => i.id === Number(id));
     }
 
-    public allLeningen() {
+    public openLeningen(): lening[] {
         return this.data.leningen
+            .filter((v) => v.end == undefined)
+            .map((l) => ({
+                ...l,
+                itemData: this.getItemById(l.item),
+                userData: this.getUserById(l.user),
+            }));
+    }
+
+    public allLeningen(): lening[] {
+        return this.data.leningen.map((l) => ({
+            ...l,
+            itemData: this.getItemById(l.item),
+            userData: this.getUserById(l.user),
+        }));
     }
 
     public removeOldLeningen() {

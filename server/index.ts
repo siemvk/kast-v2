@@ -11,9 +11,61 @@ const server = Bun.serve({
         "/api/status": new Response("OK"),
 
         // Dynamic routes
+        "/api/admin/users": req => {
+            return auth.admin(req, async () => {
+                if (req.method === "POST") {
+                    const body = await req.json() as { name?: string; pass?: string; isAdmin?: boolean } | undefined;
+                    if (!body?.name || !body?.pass) {
+                        return Response.json({ message: "Naam en wachtwoord zijn verplicht" }, { status: 400 });
+                    }
+                    if (theDB.getUserByName(body.name)) {
+                        return Response.json({ message: "Gebruiker bestaat al" }, { status: 400 });
+                    }
+                    const created = theDB.createUser(body.name, body.pass, !!body.isAdmin);
+                    return Response.json({ id: created.id, name: created.name, isAdmin: created.isAdmin });
+                }
+                return Response.json(theDB.getUsers());
+            })
+        },
         "/api/admin/users/:id": req => {
-            return auth.admin(req, () => {
-                return new Response(JSON.stringify(theDB.getUserById(req.params.id as unknown as number)));
+            return auth.admin(req, async (adminUser) => {
+                const id = Number(req.params.id);
+                if (req.method === "PUT") {
+                    const body = await req.json() as { name?: string; pass?: string; isAdmin?: boolean } | undefined;
+                    if (!body?.name) return Response.json({ message: "Naam is verplicht" }, { status: 400 });
+                    if (!theDB.updateUser(id, body)) return Response.json({ message: "Gebruiker niet gevonden" }, { status: 404 });
+                    return Response.json({ success: true });
+                }
+                if (req.method === "DELETE") {
+                    if (id === adminUser.id) {
+                        return Response.json({ message: "Je kunt jezelf niet verwijderen" }, { status: 400 });
+                    }
+                    if (!theDB.deleteUser(id)) {
+                        return Response.json({ message: "Gebruiker niet gevonden" }, { status: 404 });
+                    }
+                    return Response.json({ success: true });
+                }
+                return new Response(JSON.stringify(theDB.getUserById(id)));
+            })
+        },
+        "/api/admin/kasten/:id": req => {
+            return auth.admin(req, async () => {
+                const body = await req.json() as { name?: string; description?: string } | undefined;
+                if (!body?.name) return Response.json({ message: "Naam is verplicht" }, { status: 400 });
+                if (!theDB.updateKast(Number(req.params.id), body.name, body.description)) {
+                    return Response.json({ message: "Kast niet gevonden" }, { status: 404 });
+                }
+                return Response.json({ success: true });
+            })
+        },
+        "/api/admin/items/:id": req => {
+            return auth.admin(req, async () => {
+                const body = await req.json() as { name?: string; description?: string; kast?: number } | undefined;
+                if (!body?.name) return Response.json({ message: "Naam is verplicht" }, { status: 400 });
+                if (!theDB.updateItem(Number(req.params.id), { name: body.name, description: body.description, kast: body.kast })) {
+                    return Response.json({ message: "Item niet gevonden" }, { status: 404 });
+                }
+                return Response.json({ success: true });
             })
         },
         "/api/admin/leningen": req => {
@@ -33,7 +85,9 @@ const server = Bun.serve({
         },
         "/api/leningen": req => {
             return auth.gate(req, (user) => {
-                return new Response(JSON.stringify(theDB.openLeningen().filter((v) => v.user == user.id)));
+                return Response.json(theDB.openLeningen().filter((v) => v.user == user.id));
+            }, () => {
+                return Response.json({ error: "Niet ingelogd" }, { status: 401 });
             })
         },
 
@@ -52,6 +106,11 @@ const server = Bun.serve({
             return new Response(JSON.stringify({ success: true }));
         },
 
+        "/api/items": req => {
+            return auth.gate(req, () => {
+                return Response.json(theDB.getItems());
+            })
+        },
         "/api/kasten/list": req => {
             return auth.gate(req, () => {
                 return new Response(JSON.stringify(theDB.getKasten()))
@@ -72,8 +131,43 @@ const server = Bun.serve({
                 if (!lening) {
                     return new Response(JSON.stringify({ error: "Item niet beschikbaar" }), { status: 400 });
                 }
-                sendMessageToDiscord(`Item ${lening.item} is geleend door ${user.name} voor reden: ${body.reason}`);
+                const itemObj = theDB.getItemById(lening.item);
+                const kastObj = itemObj ? theDB.getKastById(itemObj.kast) : undefined;
+                sendMessageToDiscord("", {
+                    title: "📦 Item geleend",
+                    color: 0xff9900,
+                    fields: [
+                        { name: "Item", value: itemObj?.name ?? `#${lening.item}`, inline: true },
+                        { name: "Kast", value: kastObj?.name ?? "-", inline: true },
+                        { name: "Door", value: user.name, inline: true },
+                        { name: "Reden", value: body.reason, inline: true },
+                        { name: "Terug verwacht", value: body.prommisedReturnInfo, inline: true },
+                    ],
+                    timestamp: new Date().toISOString(),
+                });
                 return new Response(JSON.stringify(lening));
+            })
+        },
+        "/api/leningen/terug/:id": req => {
+            return auth.gate(req, (user) => {
+                const id = Number(req.params.id);
+                const lening = theDB.openLeningen().find((l) => l.id === id);
+                if (!lening || (lening.user !== user.id && !user.isAdmin)) {
+                    return Response.json({ message: "Lening niet gevonden" }, { status: 400 });
+                }
+                const kastObj = lening.itemData ? theDB.getKastById(lening.itemData.kast) : undefined;
+                theDB.returnItem(id);
+                sendMessageToDiscord("", {
+                    title: "✅ Item teruggebracht",
+                    color: 0x2ecc71,
+                    fields: [
+                        { name: "Item", value: lening.itemData?.name ?? `#${lening.item}`, inline: true },
+                        { name: "Kast", value: kastObj?.name ?? "-", inline: true },
+                        { name: "Teruggebracht door", value: user.name, inline: true },
+                    ],
+                    timestamp: new Date().toISOString(),
+                });
+                return Response.json({ success: true });
             })
         },
 
